@@ -18,21 +18,19 @@ import pickle
 mode_save_path = './bpe_model/bpe.model'
 BPE_model = youtokentome.BPE(mode_save_path, n_threads=-1)
 bpe_dropout_src2token = {}
-
-
 def prepare_new_epoch(dropout_prob, og_data_path, new_data_path, new_dict_path):
     with open(og_data_path, 'r') as f:
         file = f.read().strip().split('\n')
 
     bpe_dropout_token = BPE_model.encode(file, output_type=youtokentome.OutputType.SUBWORD,
                                          dropout_prob=dropout_prob)
-
+    
     bpe_dropout_index = BPE_model.encode(file, output_type=youtokentome.OutputType.ID,
                                          dropout_prob=dropout_prob)
     bpe_dropout_index = pickle.dumps(bpe_dropout_index)
     with open(new_data_path, 'wb') as f:
-        f.write(bpe_dropout_index)
-
+      f.write(bpe_dropout_index)
+        
     token_list = []
     for i in bpe_dropout_token:
         token_list = token_list + i
@@ -47,10 +45,10 @@ def prepare_new_epoch(dropout_prob, og_data_path, new_data_path, new_dict_path):
     # with open(new_data_path, 'w') as f:
     #     f.write(new_data)
 
-    new_dict = '\n'.join([' '.join(i[1]) for i in enumerate(bpe_dropout_src2token.items())])
-    # new_dict_path = './bpe_data/dict.fr'
-    with open(new_dict_path, 'w') as f:
-        f.write(new_dict)
+    # new_dict = '\n'.join([' '.join(i[1]) for i in enumerate(bpe_dropout_src2token.items())])
+    # # new_dict_path = './bpe_data/dict.fr'
+    # with open(new_dict_path, 'w') as f:
+    #     f.write(new_dict)
 
 
 
@@ -69,7 +67,6 @@ def get_args():
     parser.add_argument('--batch-size', default=1, type=int, help='maximum number of sentences in a batch')
     parser.add_argument('--output', required=True, type=str, help='path to the output file destination')
     parser.add_argument('--max-len', default=128, type=int, help='maximum length of generated sequence')
-
     return parser.parse_args()
 
 
@@ -103,7 +100,8 @@ def main(args):
                                                                          args.batch_size, 1, 0, shuffle=False,
                                                                          seed=args.seed))
     # Build model and criterion
-    model = models.build_model(args, src_dict, tgt_dict)
+    
+    model = models.build_model(args, Dictionary.load(os.path.join('data/en-fr/prepared', 'dict.{:s}'.format('fr'))), tgt_dict)
     if args.cuda:
         model = model.cuda()
     model.eval()
