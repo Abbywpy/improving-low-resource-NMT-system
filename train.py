@@ -172,7 +172,7 @@ def main(args):
         train_loader = \
             torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
                                         batch_sampler=BatchSampler(train_dataset, args.max_tokens, args.batch_size, 1,
-                                                                   0, shuffle=False, seed=42))
+                                                                   0, shuffle=True, seed=42))
         model.train()
         stats = OrderedDict()
         stats['loss'] = 0
