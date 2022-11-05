@@ -11,13 +11,29 @@ from torch.utils.data.sampler import Sampler
 class Seq2SeqDataset(Dataset):
     def __init__(self, src_file, tgt_file, src_dict, tgt_dict):
         self.src_dict, self.src_dict = src_dict, tgt_dict
+        # with open(src_file, 'rb') as f:
+        #     self.src_dataset_ = pickle.load(f)
+        #     self.src_sizes_ = np.array([len(tokens) for tokens in self.src_dataset])
+
+        # with open(tgt_file, 'rb') as f:
+        #     self.tgt_dataset_ = pickle.load(f)
+        #     self.tgt_sizes_ = np.array([len(tokens) for tokens in self.tgt_dataset])
+        
+        # self.src_dataset = pickle.load(f)
+
         with open(src_file, 'rb') as f:
-            self.src_dataset = pickle.load(f)
-            self.src_sizes = np.array([len(tokens) for tokens in self.src_dataset])
+            self.src_dataset_ = pickle.load(f)
+            self.src_sizes_ = np.array([len(tokens) for tokens in self.src_dataset_])
 
         with open(tgt_file, 'rb') as f:
-            self.tgt_dataset = pickle.load(f)
-            self.tgt_sizes = np.array([len(tokens) for tokens in self.tgt_dataset])
+            self.tgt_dataset_ = pickle.load(f)
+            self.tgt_sizes_ = np.array([len(tokens) for tokens in self.tgt_dataset_])
+
+        self.src_dataset = self.src_dataset_ + self.tgt_dataset_
+        self.tgt_dataset = self.tgt_dataset_ + self.tgt_dataset_
+
+        self.src_sizes = np.concatenate((self.src_sizes_, self.tgt_sizes_), axis=0)
+        self.tgt_sizes = np.concatenate((self.tgt_sizes_, self.tgt_sizes_), axis=0)
 
     def __getitem__(self, index):
         return {

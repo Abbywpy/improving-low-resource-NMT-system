@@ -71,8 +71,8 @@ def main(args):
     # Load datasets
     def load_data(split):
         return Seq2SeqDataset(
-            src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.src)),
-            tgt_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.tgt)),
+            src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.source_lang)),
+            tgt_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.target_lang)),
             src_dict=src_dict, tgt_dict=tgt_dict)
 
     train_dataset = load_data(split='train') if not args.train_on_tiny else load_data(split='tiny_train')

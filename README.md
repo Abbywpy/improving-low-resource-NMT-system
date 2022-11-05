@@ -1,4 +1,5 @@
 # atmt code base
+
 Materials for "Advanced Techniques of Machine Translation".
 Please refer to the assignment sheet for instructions on how to use the toolkit.
 
@@ -53,24 +54,26 @@ bash scripts/run_preprocessing.sh data/en-sv/infopankki/raw/
 
 ```
 python train.py \
-    --data path/to/prepared/data \
-    --source-lang en \
-    --target-lang sv \
-    --save-dir path/to/model/checkpoints \
+    --data ./data/en-fr/prepared \
+    --source-lang fr \
+    --target-lang en \
+    --save-dir models \
     --train-on-tiny # for testing purposes only
 ```
 
 Notes:
+
 - `path/to/prepared/data` and `path/to/model/checkpoints`
   are placholders, not true paths. Replace these arguments with the correct paths
   for your system.
 - only use `--train-on-tiny` for testing. This will train a
-dummy model on the `tiny_train` split.
+  dummy model on the `tiny_train` split.
 - add the `--cuda` flag if you want to train on a GPU, e.g. using Google Colab
 
 # Evaluating a trained model
 
 Run inference on test set
+
 ```
 python translate.py \
     --data path/to/prepared/data \
@@ -80,11 +83,13 @@ python translate.py \
 ```
 
 Postprocess model translations
+
 ```
 bash scripts/postprocess.sh path/to/output/file/model/translations path/to/postprocessed/model/translations/file en
 ```
 
 Score with SacreBLEU
+
 ```
 cat path/to/postprocessed/model/translations/file | sacrebleu path/to/raw/target/test/file
 ```
@@ -93,4 +98,3 @@ cat path/to/postprocessed/model/translations/file | sacrebleu path/to/raw/target
 
 Assignments must be submitted on OLAT by 14:00 on their respective
 due dates.
-
