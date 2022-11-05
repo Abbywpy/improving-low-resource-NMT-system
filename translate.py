@@ -11,48 +11,6 @@ from seq2seq import models, utils
 from seq2seq.data.dictionary import Dictionary
 from seq2seq.data.dataset import Seq2SeqDataset, BatchSampler
 
-import youtokentome
-import pickle
-
-# train, save and load BPE drop out model
-mode_save_path = './bpe_model/bpe.model'
-BPE_model = youtokentome.BPE(mode_save_path, n_threads=-1)
-bpe_dropout_src2token = {}
-def prepare_new_epoch(dropout_prob, og_data_path, new_data_path, new_dict_path):
-    with open(og_data_path, 'r') as f:
-        file = f.read().strip().split('\n')
-
-    bpe_dropout_token = BPE_model.encode(file, output_type=youtokentome.OutputType.SUBWORD,
-                                         dropout_prob=dropout_prob)
-    
-    bpe_dropout_index = BPE_model.encode(file, output_type=youtokentome.OutputType.ID,
-                                         dropout_prob=dropout_prob)
-    bpe_dropout_index = pickle.dumps(bpe_dropout_index)
-    with open(new_data_path, 'wb') as f:
-      f.write(bpe_dropout_index)
-        
-    token_list = []
-    for i in bpe_dropout_token:
-        token_list = token_list + i
-        token_list = list(set(token_list))
-
-    for i in token_list:
-        if i not in bpe_dropout_src2token:
-            bpe_dropout_src2token[i] = str(BPE_model.subword_to_id(i))
-
-    # new_data = '\n'.join([' '.join(i) for i in bpe_dropout_token])
-    # # new_data_path = './bpe_data/train.fr'
-    # with open(new_data_path, 'w') as f:
-    #     f.write(new_data)
-
-    # new_dict = '\n'.join([' '.join(i[1]) for i in enumerate(bpe_dropout_src2token.items())])
-    # # new_dict_path = './bpe_data/dict.fr'
-    # with open(new_dict_path, 'w') as f:
-    #     f.write(new_dict)
-
-
-
-
 
 def get_args():
     """ Defines generation-specific hyper-parameters. """
@@ -67,6 +25,7 @@ def get_args():
     parser.add_argument('--batch-size', default=1, type=int, help='maximum number of sentences in a batch')
     parser.add_argument('--output', required=True, type=str, help='path to the output file destination')
     parser.add_argument('--max-len', default=128, type=int, help='maximum length of generated sequence')
+
     return parser.parse_args()
 
 
@@ -80,19 +39,14 @@ def main(args):
     utils.init_logging(args)
 
     # Load dictionaries
-    # src_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.source_lang)))
-    src_dict = Dictionary.load('./bpe_data/dict.fr')
+    src_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.source_lang)))
     logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
     tgt_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.target_lang)))
     logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
 
     # Load dataset
-    prepare_new_epoch(dropout_prob=0, og_data_path='./data/en-fr/raw/test.fr', new_data_path='./bpe_data/test.fr',
-                      new_dict_path='./bpe_data/dict.fr')
-
     test_dataset = Seq2SeqDataset(
-        # src_file=os.path.join(args.data, 'test.{:s}'.format(args.source_lang)),
-        src_file='./bpe_data/test.fr',
+        src_file=os.path.join(args.data, 'test.{:s}'.format(args.source_lang)),
         tgt_file=os.path.join(args.data, 'test.{:s}'.format(args.target_lang)),
         src_dict=src_dict, tgt_dict=tgt_dict)
     test_loader = torch.utils.data.DataLoader(test_dataset, num_workers=1, collate_fn=test_dataset.collater,
@@ -100,8 +54,7 @@ def main(args):
                                                                          args.batch_size, 1, 0, shuffle=False,
                                                                          seed=args.seed))
     # Build model and criterion
-    
-    model = models.build_model(args, Dictionary.load(os.path.join('data/en-fr/prepared', 'dict.{:s}'.format('fr'))), tgt_dict)
+    model = models.build_model(args, src_dict, tgt_dict)
     if args.cuda:
         model = model.cuda()
     model.eval()
