@@ -22,12 +22,12 @@ class Seq2SeqDataset(Dataset):
         # self.src_dataset = pickle.load(f)
         if test:
             with open(src_file, 'rb') as f:
-                self.src_dataset_ = pickle.load(f)
-                self.src_sizes_ = np.array([len(tokens) for tokens in self.src_dataset])
+                self.src_dataset = pickle.load(f)
+                self.src_sizes = np.array([len(tokens) for tokens in self.src_dataset])
 
             with open(tgt_file, 'rb') as f:
-                self.tgt_dataset_ = pickle.load(f)
-                self.tgt_sizes_ = np.array([len(tokens) for tokens in self.tgt_dataset])
+                self.tgt_dataset = pickle.load(f)
+                self.tgt_sizes = np.array([len(tokens) for tokens in self.tgt_dataset])
         else:
             with open(src_file, 'rb') as f:
                 self.src_dataset_ = pickle.load(f)
