@@ -10,7 +10,7 @@ from torch.utils.data.sampler import Sampler
 
 class Seq2SeqDataset(Dataset):
     def __init__(self, src_file, tgt_file, src_dict, tgt_dict):
-        self.src_dict, self.src_dict = src_dict, tgt_dict
+        self.src_dict, self.tgt_dict = src_dict, tgt_dict
         with open(src_file, 'rb') as f:
             self.src_dataset = pickle.load(f)
             self.src_sizes = np.array([len(tokens) for tokens in self.src_dataset])
@@ -33,22 +33,45 @@ class Seq2SeqDataset(Dataset):
         """Merge a list of samples to form a mini-batch."""
         if len(samples) == 0:
             return {}
-        def merge(values, move_eos_to_beginning=False):
+    #     def merge(values, move_eos_to_beginning=False):
+    #         max_length = max(v.size(0) for v in values)
+    #         result = values[0].new(len(values), max_length).fill_(self.src_dict.pad_idx)
+    #         for i, v in enumerate(values):
+    #             if move_eos_to_beginning:
+    #                 assert v[-1] == self.src_dict.eos_idx
+    #                 result[i, 0] = self.src_dict.eos_idx
+    #                 result[i, 1:len(v)] = v[:-1]
+    #             else:
+    #                 result[i, :len(v)].copy_(v)
+    #         return result
+    #
+    #     id = torch.LongTensor([s['id'] for s in samples])
+    #     src_tokens = merge([s['source'] for s in samples])
+    #     tgt_tokens = merge([s['target'] for s in samples])
+    #     tgt_inputs = merge([s['target'] for s in samples], move_eos_to_beginning=True)
+
+       # try? don't if it's right?
+        def merge(values, dict_type,move_eos_to_beginning=False):
             max_length = max(v.size(0) for v in values)
-            result = values[0].new(len(values), max_length).fill_(self.src_dict.pad_idx)
+            result = values[0].new(len(values), max_length).fill_(dict_type.pad_idx)
             for i, v in enumerate(values):
                 if move_eos_to_beginning:
-                    assert v[-1] == self.src_dict.eos_idx
-                    result[i, 0] = self.src_dict.eos_idx
+                    assert v[-1] == dict_type.eos_idx
+                    result[i, 0] = dict_type.eos_idx
                     result[i, 1:len(v)] = v[:-1]
+
                 else:
                     result[i, :len(v)].copy_(v)
             return result
 
         id = torch.LongTensor([s['id'] for s in samples])
-        src_tokens = merge([s['source'] for s in samples])
-        tgt_tokens = merge([s['target'] for s in samples])
-        tgt_inputs = merge([s['target'] for s in samples], move_eos_to_beginning=True)
+        src_tokens = merge([s['source'] for s in samples], dict_type=self.src_dict)
+        tgt_tokens = merge([s['target'] for s in samples], dict_type=self.tgt_dict)
+        # tgt_inputs = merge([s['target'] for s in samples], dict_type=self.tgt_dict)
+        tgt_inputs = merge([s['target'] for s in samples], dict_type=self.tgt_dict,move_eos_to_beginning=True)
+
+
+
 
         # Sort by descending source length
         src_lengths = torch.LongTensor([s['source'].numel() for s in samples])

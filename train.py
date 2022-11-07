@@ -1,11 +1,10 @@
 import os
 import logging
 import argparse
-import pickle
-
 import numpy as np
 from tqdm import tqdm
 from collections import OrderedDict
+import create_bpe_file
 
 import torch
 import torch.nn as nn
@@ -14,49 +13,7 @@ from seq2seq import models, utils
 from seq2seq.data.dictionary import Dictionary
 from seq2seq.data.dataset import Seq2SeqDataset, BatchSampler
 from seq2seq.models import ARCH_MODEL_REGISTRY, ARCH_CONFIG_REGISTRY
-
-import youtokentome
-import pickle
-
-
-# train, save and load BPE drop out model
-train_data_path = './data/en-fr/raw/train.fr'
-mode_save_path = './bpe_model/bpe.model'
-youtokentome.BPE.train(train_data_path, mode_save_path, vocab_size=4000, n_threads=-1, coverage=0.9999)
-BPE_model = youtokentome.BPE(mode_save_path, n_threads=-1)
-bpe_dropout_src2token = {}
-def prepare_new_epoch(dropout_prob, og_data_path, new_data_path, new_dict_path):
-    with open(og_data_path, 'r') as f:
-        file = f.read().strip().split('\n')
-
-    bpe_dropout_token = BPE_model.encode(file, output_type=youtokentome.OutputType.SUBWORD,
-                                         dropout_prob=dropout_prob)
-
-    bpe_dropout_index = BPE_model.encode(file, output_type=youtokentome.OutputType.ID,
-                                         dropout_prob=dropout_prob)
-    bpe_dropout_index = pickle.dumps(bpe_dropout_index)
-    with open(new_data_path, 'wb') as f:
-        f.write(bpe_dropout_index)
-
-    token_list = []
-    for i in bpe_dropout_token:
-        token_list = token_list + i
-        token_list = list(set(token_list))
-
-    for i in token_list:
-        if i not in bpe_dropout_src2token:
-            bpe_dropout_src2token[i] = str(BPE_model.subword_to_id(i))
-
-    # new_data = '\n'.join([' '.join(i) for i in bpe_dropout_token])
-    # # new_data_path = './bpe_data/train.fr'
-    # with open(new_data_path, 'w') as f:
-    #     f.write(new_data)
-
-    new_dict = '\n'.join([' '.join(i[1]) for i in enumerate(bpe_dropout_src2token.items())])
-    # new_dict_path = './bpe_data/dict.fr'
-    with open(new_dict_path, 'w') as f:
-        f.write(new_dict)
-
+import random
 
 
 def get_args():
@@ -90,6 +47,12 @@ def get_args():
     parser.add_argument('--no-save', action='store_true', help='don\'t save models or checkpoints')
     parser.add_argument('--epoch-checkpoints', action='store_true', help='store all epoch checkpoints')
 
+    # Add bpe parameters
+    parser.add_argument('--BpeDropOutSrc', default=1, type=float, help='if 1, no dropput; if 0.1, dropout; for src')
+    parser.add_argument('--BpeDropOutTar', default=1, type=float, help='if 1, no dropput; if 0.1, dropout; for Target')
+    # parser.add_argument('--IfSrcBpe', default=False, type=bool, help='if Src bpe')
+    # parser.add_argument('--IfTarBpe', default=False, type=bool, help='if Target bpe')
+
     # Parse twice as model arguments are not known the first time
     args, _ = parser.parse_known_args()
     model_parser = parser.add_argument_group(argument_default=argparse.SUPPRESS)
@@ -97,12 +60,6 @@ def get_args():
     args = parser.parse_args()
     ARCH_CONFIG_REGISTRY[args.arch](args)
     return args
-
-
-
-
-
-
 
 
 def main(args):
@@ -115,28 +72,47 @@ def main(args):
     utils.init_logging(args)
 
 
-    #Load dictionaries
+
+
+
+
+    # Load dictionaries
     src_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.source_lang)))
     logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
     tgt_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.target_lang)))
     logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
 
+
+    new_file_path = 'bpe_data/prepared/'
+    # src
+    # creat new src file for training src
+    create_bpe_file.make_scrfile_by_srcdict(bpe_dict=src_dict, old_file='data/en-fr/preprocessed/train.fr',
+                                                   new_pickle=new_file_path+'train.fr')
+    # creat new src file for validation
+    create_bpe_file.make_scrfile_by_srcdict(bpe_dict=src_dict, old_file='data/en-fr/preprocessed/valid.fr',
+                                                   new_pickle=new_file_path+'valid.fr')
+
+    # target
+    # traning target
+    create_bpe_file.make_scrfile_by_tardict(bpe_dict=tgt_dict, old_file='data/en-fr/preprocessed/train.en',
+                                            new_pickle=new_file_path+'train.en')
+    # creat new tar file for validation
+    create_bpe_file.make_scrfile_by_tardict(bpe_dict=tgt_dict, old_file='data/en-fr/preprocessed/valid.en',
+                                            new_pickle=new_file_path + 'valid.en')
+
+
+
+
+
     # Load datasets
-    def load_data(split, src_file, src_dict):
+    def load_data(split):
         return Seq2SeqDataset(
-            # src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.source_lang)),
-            src_file=src_file,
+            src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.source_lang)),
             tgt_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.target_lang)),
             src_dict=src_dict, tgt_dict=tgt_dict)
 
-    # train_dataset = load_data(split='train') if not args.train_on_tiny else load_data(split='tiny_train')
-    # valid_dataset = load_data(split='valid',)
-
-    # prapre validate data
-    prepare_new_epoch(dropout_prob=0, og_data_path='./data/en-fr/preprocessed/valid.fr', new_data_path='./bpe_data/valid.fr',
-                      new_dict_path='./bpe_data/dict.fr')
-    valid_dataset = load_data(split='valid', src_file='./bpe_data/valid.fr',
-                              src_dict=Dictionary.load('./bpe_data/dict.fr'))
+    train_dataset = load_data(split='train') if not args.train_on_tiny else load_data(split='tiny_train')
+    valid_dataset = load_data(split='valid')
 
     # Build model and optimization criterion
     model = models.build_model(args, src_dict, tgt_dict)
@@ -158,21 +134,25 @@ def main(args):
     best_validate = float('inf')
 
     for epoch in range(last_epoch + 1, args.max_epoch):
-        # BPE every new epoch
-        prepare_new_epoch(dropout_prob=0.1, og_data_path=train_data_path,new_data_path='./bpe_data/train.fr',
-                          new_dict_path='./bpe_data/dict.fr')
 
-        train_dataset = load_data(split='train', src_file='./bpe_data/train.fr',
-                                  src_dict=Dictionary.load('./bpe_data/dict.fr'))
+        if args.BpeDropOutSrc!=1:
+            # src bpe drop out
+            create_bpe_file.make_scrfile_by_srcdict(bpe_dict=src_dict, old_file='data/en-fr/preprocessed/train.fr',
+                                                    new_pickle=new_file_path + 'train.fr',
+                                                    dropoutrate=args.BpeDropOutSrc)
+        if args.BpeDropOutTar != 1:
+            create_bpe_file.make_scrfile_by_tardict(bpe_dict=tgt_dict, old_file='data/en-fr/preprocessed/train.en',
+                                                    new_pickle=new_file_path + 'train.en',
+                                                    dropoutrate=args.BpeDropOutTar)
+
+        if (args.BpeDropOutSrc!=1) or (args.BpeDropOutTar != 1):
+            train_dataset = load_data(split='train')
+
+        train_loader = torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
+                                            batch_sampler=BatchSampler(train_dataset, args.max_tokens, args.batch_size, 1,
+                                                                       0, shuffle=True, seed=42))
 
 
-
-
-
-        train_loader = \
-            torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
-                                        batch_sampler=BatchSampler(train_dataset, args.max_tokens, args.batch_size, 1,
-                                                                   0, shuffle=True, seed=42))
         model.train()
         stats = OrderedDict()
         stats['loss'] = 0
