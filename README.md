@@ -1,96 +1,86 @@
-# atmt code base
-Materials for "Advanced Techniques of Machine Translation".
-Please refer to the assignment sheet for instructions on how to use the toolkit.
+# ATMT assignment_03 BPE and BPE drop out
+Fr-En translation with srouce and target sentences in BEP or BEP-dropout tokens.
 
-The toolkit is based on [this implementation](https://github.com/demelin/nmt_toolkit).
+# New scripts
 
-# Environment Setup
-
-### conda
+### atmt_2022/test.py
 
 ```
-# ensure that you have conda (or miniconda) installed (https://conda.io/projects/conda/en/latest/user-guide/install/index.html) and that it is activated
-
-# create clean environment
-conda create --name atmt36 python=3.6
-
-# activate the environment
-conda activate atmt36
-
-# intall required packages
-pip install torch==1.6.0 numpy tqdm sacrebleu
+Create bpe token dict(dict.fr, dict.en ) from 
+train.fr and train.en in  /atmt_2022/data/en-fr/preprocessed/
 ```
 
-### virtualenv
+### atmt_2022/ create_bpe_file.py
 
 ```
-# ensure that you have python 3.6 downloaded and installed (https://www.python.org/downloads/)
-
-# install virtualenv
-pip install virtualenv
-
-# create a virtual environment named "atmt36"
-virtualenv --python=python3 atmt36
-
-# launch the newly created environment
-atmt36/bin/activate
-
-# intall required packages
-pip install torch==1.6.0 numpy tqdm sacrebleu
+Create training, validation and testing data with bpe token 
+dict and original preprocessed datasets for model
 ```
-
-<!-- # Data Preprocessing
+### atmt_2022/BPE_decode.py
 
 ```
-# normalise, tokenize and truecase data
-bash scripts/extract_splits.sh ../infopankki_raw data/en-sv/infopankki/raw
-
-# binarize data for model training
-bash scripts/run_preprocessing.sh data/en-sv/infopankki/raw/
-``` -->
+After translate.py, the generated txt is shown in BEP tokens. 
+We need to transform it into normal English tokens before running postprocess.sh
+```
 
 # Training a model
 
 ```
-python train.py \
-    --data path/to/prepared/data \
-    --source-lang en \
-    --target-lang sv \
-    --save-dir path/to/model/checkpoints \
-    --train-on-tiny # for testing purposes only
+!python train.py \
+    --data bpe_data/prepared \
+    --source-lang fr \
+    --target-lang en \
+    --save-dir assignments/13/baseline/checkpoints \
+    --batch-size 348 \
+    --patience 15 \
+    --log-file log/13.log \
+    --lr 0.0005 \
+    --cuda\
+    --BpeDropOutSrc 1\
+    --BpeDropOutTar 1 \
+    --encoder-embed-dim 128 \
+    --encoder-hidden-size 128 \
+    --decoder-embed-dim 128 \
+    --decoder-hidden-size 256 \
+    --encoder-num-layers 1 \
+    --decoder-num-layers 1 
 ```
 
 Notes:
-- `path/to/prepared/data` and `path/to/model/checkpoints`
-  are placholders, not true paths. Replace these arguments with the correct paths
-  for your system.
-- only use `--train-on-tiny` for testing. This will train a
-dummy model on the `tiny_train` split.
-- add the `--cuda` flag if you want to train on a GPU, e.g. using Google Colab
+- --BpeDropOutSrc,--BpeDropOutTar 1 means no dropout; set 0.1 as paper suggests
 
 # Evaluating a trained model
 
 Run inference on test set
 ```
-python translate.py \
-    --data path/to/prepared/data \
-    --dicts path/to/prepared/data \
-    --checkpoint-path path/to/model/checkpoint/file/for/loading \
-    --output path/to/output/file/model/translations
+!python translate.py \
+    --data bpe_data/prepared \
+    --dicts bpe_data/prepared \
+    --checkpoint-path assignments/13/baseline/checkpoints/checkpoint_last.pt \
+    --output assignments/13/baseline/enfr_translations.txt \
+    --batch-size 128 \
+    --cuda
+```
+After translate.py, the generated txt is shown in BEP tokens. We need to transform it into normal English tokens before
+running postprocess.sh
+```
+!python BPE_decode.py \
+  --filePath assignments/13/baseline/enfr_translations.txt \
+  --newFilePath assignments/13/baseline/enfr_translations_new.txt
 ```
 
 Postprocess model translations
 ```
-bash scripts/postprocess.sh path/to/output/file/model/translations path/to/postprocessed/model/translations/file en
+!bash scripts/postprocess.sh \
+    assignments/13/baseline/enfr_translations_new.txt \
+    assignments/13/baseline/enfr_translations.p.txt en
 ```
 
 Score with SacreBLEU
 ```
-cat path/to/postprocessed/model/translations/file | sacrebleu path/to/raw/target/test/file
+!cat \
+    assignments/13/baseline/enfr_translations.p.txt \
+    | sacrebleu data/en-fr/raw/test.en
 ```
 
-# Assignments
-
-Assignments must be submitted on OLAT by 14:00 on their respective
-due dates.
 
